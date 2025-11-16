@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/yin1895/tinylink/storage"
+	"github.com/yin1895/tinylink/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )

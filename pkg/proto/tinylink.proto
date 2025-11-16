@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+    package proto;
+
+    // 声明生成的 go 代码应该放在哪个包
+    option go_package = "github.com/yin1895/tinylink/pkg/proto";
+
+    // 定义 ID 生成器服务
+    service IdGenerator {
+      // 定义一个 RPC 方法，叫 GenerateId
+      // 它接收一个空请求 (Empty)
+      // 并返回一个包含新 ID 的响应 (GenerateIdResponse)
+      rpc GenerateId(Empty) returns (GenerateIdResponse);
+    }
+
+    // 空请求消息
+    message Empty {}
+
+    // 包含新生成 ID 的响应消息
+    message GenerateIdResponse {
+      int64 id = 1;
+    }

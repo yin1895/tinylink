@@ -4,8 +4,8 @@ package main
 import (
 	"log"
 
-	"github.com/yin1895/tinylink/api"     // 引用 api 包
-	"github.com/yin1895/tinylink/storage" // 引用 storage 包
+	"github.com/yin1895/tinylink/cmd/tinylink-api/api" // 引用 api 包
+	"github.com/yin1895/tinylink/internal/storage"     // 引用 storage 包
 
 	"github.com/gin-gonic/gin"
 )
