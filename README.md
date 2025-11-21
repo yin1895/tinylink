@@ -1,18 +1,24 @@
 # TinyLink - Distributed Short Link & Analytics Platform
 
-TinyLink 是一个基于微服务架构的高性能短链接生成与数据分析平台。
+TinyLink 是一个基于云原生架构的高性能分布式短链接平台。不仅实现了核心业务，更注重**高可用**、**高并发**与**可观测性**的工程实践。
 
 ![License](https://img.shields.io/badge/license-MIT-blue.svg)
 ![Go](https://img.shields.io/badge/Go-1.21+-00ADD8.svg)
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB.svg)
 
-## 🚀 核心特性
+## 🌟 核心亮点 (Key Features)
 
-- **微服务架构**：核心 API (Go/Gin) 与 发号器 (Go/gRPC) 分离。
-- **高性能存储**：MySQL 持久化 + Redis 缓存 + 布隆过滤器（防止缓存穿透）。
-- **异步数据分析**：基于 Kafka 的事件驱动架构，使用 Python 消费者进行流量分析（IP/User-Agent）。
-- **工业级稳定性**：全链路实现优雅停机 (Graceful Shutdown)。
-- **容器化部署**：基于 Docker Compose 的一键部署环境。
+### 1. 架构设计
+- **微服务拆分**: 采用 gRPC 拆分 **API 网关** 与 **ID 生成器**，实现职责分离。
+- **异步解耦**: 引入 **Kafka** 构建事件驱动架构，将数据分析逻辑异步化，由 Python 消费者处理。
+
+### 2. 性能与稳定性
+- **多级缓存**: Redis 缓存热点数据，配合 **布隆过滤器 (Bloom Filter)** 彻底解决缓存穿透问题。
+- **优雅停机**: 全链路实现 Graceful Shutdown，确保滚动更新时零请求丢失。
+
+### 3. 可观测性 (Observability)
+- **监控体系**: 集成 **Prometheus** 采集服务 RED 指标 (Request, Error, Duration)。
+- **可视化**: 部署 **Grafana** 实时监控 QPS、响应延迟与系统健康度。
 
 ## 🛠 技术栈
 
