@@ -1,0 +1,8 @@
+# monitoring/prometheus/prometheus.yml
+global:
+  scrape_interval: 5s # 每 5 秒抓取一次数据 (为了演示效果，设置快一点)
+
+scrape_configs:
+  - job_name: 'tinylink-api'
+    static_configs:
+      - targets: ['tinylink-api:8080'] # 这里的 host 要和 docker-compose 里的服务名一致

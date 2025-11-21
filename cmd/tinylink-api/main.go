@@ -10,7 +10,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	api "github.com/yin1895/tinylink/cmd/tinylink-api/api"
+	"github.com/yin1895/tinylink/cmd/tinylink-api/middleware"
 	"github.com/yin1895/tinylink/internal/storage"
 	pb "github.com/yin1895/tinylink/pkg/proto"
 
@@ -65,8 +67,15 @@ func main() {
 
 	// 6. 启动 HTTP 服务
 	router := gin.Default()
+
+	// (新) 注册监控中间件
+	router.Use(middleware.PrometheusMiddleware())
+
 	router.POST("/shorten", api.ShortenURLHandler)
 	router.GET("/:shortURL", api.RedirectHandler)
+
+	// (新) 暴露 Prometheus 指标接口
+	router.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	srv := &http.Server{
 		Addr:    ":8080",

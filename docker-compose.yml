@@ -1,4 +1,4 @@
-# docker-compose.yml
+# /home/yin/tinylink/docker-compose.yml
 services:
   # 1. 数据库服务
   db:
@@ -47,12 +47,9 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # 指向 Zookeeper
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      # 告诉外部（其他容器）怎么连接自己：主机名是 kafka，端口 9092
       KAFKA_ADVERTISED_HOST_NAME: kafka
       KAFKA_ADVERTISED_PORT: 9092
-      # 自动创建 topic，避免代码报错（格式：Topic名:分区数:副本数）
       KAFKA_CREATE_TOPICS: "link_clicks:1:1"
     depends_on:
       - zookeeper
@@ -116,6 +113,34 @@ services:
     networks:
       - tinylink-net
 
+  # (新) Prometheus: 数据采集
+  prometheus:
+    image: prom/prometheus:latest
+    restart: always
+    volumes:
+      # 挂载配置文件（请确保文件存在： ./monitoring/prometheus/prometheus.yml）
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      # 可选：持久化数据
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090" # Web UI 端口
+    networks:
+      - tinylink-net
+
+  # (新) Grafana: 数据展示
+  grafana:
+    image: grafana/grafana:latest
+    restart: always
+    ports:
+      - "3000:3000" # Web UI 端口
+    volumes:
+      # 持久化 Grafana 数据（dashboards、配置等）
+      - grafana_data:/var/lib/grafana
+      # 可选：预配置文件夹（如果需要）
+      # - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - tinylink-net
+
 networks:
   tinylink-net:
     driver: bridge
@@ -123,3 +148,5 @@ networks:
 volumes:
   mysql_data:
   redis_data:
+  prometheus_data:
+  grafana_data:
