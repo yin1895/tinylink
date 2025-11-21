@@ -23,6 +23,7 @@ TinyLink 是一个基于微服务架构的高性能短链接生成与数据分�
 
 ## 🏗 架构图
 
+<pre>
 User Request -> [Nginx/API Gateway]  
                       |  
       -----------------------------------  
@@ -36,6 +37,7 @@ User Request -> [Nginx/API Gateway]
                                   [Python Consumer]  
                                         |  
                                   [MySQL Analytics]
+</pre>
 
 ## ⚡️ 快速开始
 
