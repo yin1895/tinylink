@@ -13,6 +13,7 @@ var (
 	Db  *sql.DB
 	Rdb *redis.Client
 	Ctx = context.Background()
+	BF  *BloomFilter
 )
 
 // 初始化 MySQL 连接
@@ -66,12 +67,16 @@ func GetNextID() (int64, error) {
 }
 
 // 初始化 Redis 连接
-func InitRedis() {
+func InitRedis() error {
 	Rdb = redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
+	if _, err := Rdb.Ping(Ctx).Result(); err != nil {
+		return err
+	}
+	return nil
 }
 
 // 将长链接存入 MySQL 并返回自增 ID

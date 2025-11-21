@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -44,6 +45,23 @@ func fromBase62(str string) int64 {
 
 func RedirectHandler(c *gin.Context) {
 	shortCode := c.Param("shortURL")
+
+	// --- 新增代码开始 ---
+	// 0. 布隆过滤器拦截 (缓存穿透保护)
+	// 这一步是性能优化的核心！
+	exists, err := storage.BF.Exists(shortCode)
+	if err != nil {
+		// 如果 Redis 挂了或网络错误，为了保险起见，我们通常选择“放行”
+		// 让请求继续走后续流程，避免因为防御组件故障导致服务不可用
+		log.Printf("Bloom filter error: %v", err)
+	} else if !exists {
+		// 核心逻辑：如果布隆过滤器说“一定不存在”，那就一定不存在
+		// 直接返回 404，甚至不需要去查 Redis 缓存，更不需要查 MySQL
+		// 极大地保护了后端存储
+		c.JSON(http.StatusNotFound, gin.H{"error": "URL not found (intercepted by bloom filter)"})
+		return
+	}
+	// --- 新增代码结束 ---
 
 	// 1. 先从 Redis 缓存中查找
 	longURL, err := storage.Rdb.Get(storage.Ctx, shortCode).Result()
@@ -97,10 +115,16 @@ func ShortenURLHandler(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save URL with new ID"})
 		return
 	}
-	// ---- 改造结束 ----
 
-	// 3. (不变) 将这个ID转换为Base62的短码
+	// 3. 将这个ID转换为Base62的短码
 	shortCode := toBase62(id)
+
+	// 4. 将生成的短码加入布隆过滤器
+	// 我们把短码作为 key 加入，因为用户查询时是用短码查的
+	if err := storage.BF.Add(shortCode); err != nil {
+		// 为了可用性，选择记录日志并继续（降级策略）
+		log.Printf("Failed to add to bloom filter: %v\n", err)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"short_url": "http://localhost:8080/" + shortCode,
