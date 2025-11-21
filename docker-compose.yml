@@ -1,9 +1,10 @@
 # docker-compose.yml
-version: '3.8'
-
 services:
+  # 1. 数据库服务
   db:
     image: mysql:8.0
+    # 如果你的电脑是 M1/M2 芯片，请取消下面这行的注释
+    # platform: linux/amd64
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: 'root_password'
@@ -12,7 +13,14 @@ services:
       - "33061:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - tinylink-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
 
+  # 2. 缓存服务
   cache:
     image: redis:6.2-alpine
     restart: always
@@ -20,6 +28,97 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - tinylink-net
+
+  # 3. Zookeeper (更换为 wurstmeister，极度稳定)
+  zookeeper:
+    image: wurstmeister/zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    networks:
+      - tinylink-net
+
+  # 4. Kafka (更换为 wurstmeister，极度稳定)
+  kafka:
+    image: wurstmeister/kafka
+    restart: always
+    ports:
+      - "9092:9092"
+    environment:
+      # 指向 Zookeeper
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      # 告诉外部（其他容器）怎么连接自己：主机名是 kafka，端口 9092
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ADVERTISED_PORT: 9092
+      # 自动创建 topic，避免代码报错（格式：Topic名:分区数:副本数）
+      KAFKA_CREATE_TOPICS: "link_clicks:1:1"
+    depends_on:
+      - zookeeper
+    networks:
+      - tinylink-net
+
+  # 5. ID 生成器服务 (Go)
+  id-generator:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: id-generator
+    environment:
+      - DB_HOST=db:3306
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - tinylink-net
+
+  # 6. TinyLink API 服务 (Go)
+  tinylink-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: tinylink-api
+    environment:
+      - DB_HOST=db:3306
+      - REDIS_HOST=cache:6379
+      - ID_SERVICE_ADDR=id-generator:50051
+      - KAFKA_BROKER=kafka:9092
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+      cache:
+        condition: service_started
+      kafka:
+        condition: service_started
+      id-generator:
+        condition: service_started
+    networks:
+      - tinylink-net
+
+  # 7. 数据分析服务 (Python)
+  analytics:
+    build:
+      context: ./analytics
+      dockerfile: Dockerfile
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - DB_HOST=db:3306
+    depends_on:
+      kafka:
+        condition: service_started
+      db:
+        condition: service_healthy
+    networks:
+      - tinylink-net
+
+networks:
+  tinylink-net:
+    driver: bridge
 
 volumes:
   mysql_data:

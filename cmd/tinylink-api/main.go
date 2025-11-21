@@ -20,34 +20,38 @@ import (
 )
 
 func main() {
-	// 1. 初始化资源
+	// 1. 初始化 MySQL
 	if err := storage.InitMySQL(); err != nil {
 		log.Fatalf("Failed to connect to MySQL: %v", err)
 	}
-	// 记得程序退出前关闭数据库连接
 	defer func() {
 		if storage.Db != nil {
 			storage.Db.Close()
-			log.Println("MySQL connection closed.")
 		}
 	}()
 
+	// 2. 初始化 Redis
 	if err := storage.InitRedis(); err != nil {
 		log.Fatalf("Failed to connect to Redis: %v", err)
 	}
-	// 关闭 Redis 连接
 	defer func() {
 		if storage.Rdb != nil {
 			storage.Rdb.Close()
-			log.Println("Redis connection closed.")
 		}
 	}()
 
-	// 初始化布隆过滤器
-	storage.BF = storage.NewBloomFilter("tinylink:bloom_filter", 1000000, 0.01)
-	log.Println("Bloom Filter initialized.")
+	// 3. 初始化 Kafka (新增)
+	storage.InitKafka()
+	defer func() {
+		if storage.KafkaWriter != nil {
+			storage.KafkaWriter.Close()
+		}
+	}()
 
-	// 2. 连接 ID 生成器服务
+	// 4. 初始化布隆过滤器
+	storage.BF = storage.NewBloomFilter("tinylink:bloom_filter", 1000000, 0.01)
+
+	// 5. 连接 ID 生成器服务 (支持环境变量)
 	idServiceAddr := os.Getenv("ID_SERVICE_ADDR")
 	if idServiceAddr == "" {
 		idServiceAddr = "localhost:50051"
@@ -59,7 +63,7 @@ func main() {
 	defer conn.Close()
 	api.IdGenClient = pb.NewIdGeneratorClient(conn)
 
-	// 3. 配置 HTTP 服务器
+	// 6. 启动 HTTP 服务
 	router := gin.Default()
 	router.POST("/shorten", api.ShortenURLHandler)
 	router.GET("/:shortURL", api.RedirectHandler)
@@ -69,7 +73,6 @@ func main() {
 		Handler: router,
 	}
 
-	// 4. 独立的 Goroutine 中启动服务器
 	go func() {
 		log.Println("Starting HTTP server on :8080 ...")
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -77,18 +80,11 @@ func main() {
 		}
 	}()
 
-	// 5. 监听系统信号 (优雅停机的核心)
-	// 创建一个通道接收信号
+	// 7. 优雅停机
 	quit := make(chan os.Signal, 1)
-	// 监听 SIGINT (Ctrl+C) 和 SIGTERM (Docker stop)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-
-	// 程序阻塞直到收到信号
 	<-quit
 	log.Println("Shutting down server...")
-
-	//6.停机逻辑
-	// 创建一个 5 秒的超时上下文。
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -96,6 +92,5 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown: ", err)
 	}
-
 	log.Println("Server exiting")
 }
